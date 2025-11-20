@@ -105,7 +105,7 @@ let toList (set: PrefixTreeSet<'T>) : 'T list list =
         node.children
         |> Map.fold (fun acc' key child -> collect acc' (key :: currentPath) child) newPath
 
-    collect [] [] set.root |> List.filter (fun x -> x <> [])
+    collect [] [] set.root
 
 let fold (folder: 'State -> 'T list -> 'State) (state: 'State) (set: PrefixTreeSet<'T>) : 'State =
     let rec collect acc currentPath node =
