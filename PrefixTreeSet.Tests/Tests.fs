@@ -1,17 +1,8 @@
 ﻿module TrieSet.Tests
 
 open Xunit
-open FsCheck
 open FsCheck.Xunit
 open TrieSet
-
-// Configure FsCheck globally
-// type FsCheckConfig() =
-//     static member Configure() =
-//         { Config.Default with
-//             MaxTest = 100
-//             MaxSize = 15
-//             StartSize = 1 }
 
 [<Property(MaxTest = 50)>]
 let ``Add makes sequence contained`` (seq: int list) =
@@ -178,3 +169,39 @@ let ``ToList includes empty sequence`` () =
     Assert.Contains([], results)
     Assert.Contains([ 1 ], results)
     Assert.Equal(2, List.length results)
+
+
+//monoid tests
+
+[<Property(MaxTest = 50)>]
+let ``Left identity: union empty set = set`` (seqs: Set<int list>) =
+    let set = seqs |> Set.fold (fun s seq -> s |> add seq) empty
+    let result = union empty set
+    let expectedSeqs = toList set |> Set.ofList
+    let actualSeqs = toList result |> Set.ofList
+    actualSeqs = expectedSeqs
+
+[<Property(MaxTest = 50)>]
+let ``Right identity: union set empty = set`` (seqs: Set<int list>) =
+    let set = seqs |> Set.fold (fun s seq -> s |> add seq) empty
+    let result = union set empty
+    let expectedSeqs = toList set |> Set.ofList
+    let actualSeqs = toList result |> Set.ofList
+    actualSeqs = expectedSeqs
+
+[<Property(MaxTest = 20)>] // Reduced due to combinatorial complexity
+let ``Associativity: (set1 <> set2) <> set3 = set1 <> (set2 <> set3)``
+    (seqs1: Set<int list>, seqs2: Set<int list>, seqs3: Set<int list>)
+    =
+
+    let set1 = seqs1 |> Set.fold (fun s seq -> s |> add seq) empty
+    let set2 = seqs2 |> Set.fold (fun s seq -> s |> add seq) empty
+    let set3 = seqs3 |> Set.fold (fun s seq -> s |> add seq) empty
+
+    // (set1 <> set2) <> set3
+    let leftAssoc = union (union set1 set2) set3 |> toList |> Set.ofList
+
+    // set1 <> (set2 <> set3)
+    let rightAssoc = union set1 (union set2 set3) |> toList |> Set.ofList
+
+    leftAssoc = rightAssoc
