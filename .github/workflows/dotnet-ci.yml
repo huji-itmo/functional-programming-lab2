@@ -20,7 +20,7 @@ jobs:
         with:
           dotnet-version: 9.0.x
       - name: Restore dependencies
-        run: dotnet restore --project PrefixTreeSet \
+        run: dotnet restore --project PrefixTreeSet /
           dotnet restore --project PrefixTreeSet.Tests
 
       - name: Install FSharpLint globally
