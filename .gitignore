@@ -512,7 +512,6 @@ cmake_install.cmake
 *.suo
 *.user
 *.vcxproj*
-*.sln
 *.filters
 *.vcproj
 *.ncb
