@@ -1,18 +1,16 @@
 module TrieSet
 
-type PrefixTreeSetNode<'T when 'T : comparison> = {
-    children: Map<'T, PrefixTreeSetNode<'T>>
-    isEndOfSequence: bool
-}
+type PrefixTreeSetNode<'T when 'T: comparison> =
+    { children: Map<'T, PrefixTreeSetNode<'T>>
+      isEndOfSequence: bool }
 
-type PrefixTreeSet<'T when 'T : comparison> = {
-    root: PrefixTreeSetNode<'T>
-}
+type PrefixTreeSet<'T when 'T: comparison> = { root: PrefixTreeSetNode<'T> }
 
 // Basic Operations
-let empty : PrefixTreeSet<'T> = {
-    root = { children = Map.empty; isEndOfSequence = false }
-}
+let empty: PrefixTreeSet<'T> =
+    { root =
+        { children = Map.empty
+          isEndOfSequence = false } }
 
 let add (seq: seq<'T>) (set: PrefixTreeSet<'T>) : PrefixTreeSet<'T> =
     let rec insertSeq seqList node =
@@ -21,11 +19,17 @@ let add (seq: seq<'T>) (set: PrefixTreeSet<'T>) : PrefixTreeSet<'T> =
         | head :: tail ->
             let child =
                 Map.tryFind head node.children
-                |> Option.defaultValue { children = Map.empty; isEndOfSequence = false }
-            let newChild = insertSeq tail child
-            { node with children = Map.add head newChild node.children }
+                |> Option.defaultValue
+                    { children = Map.empty
+                      isEndOfSequence = false }
 
-    { set with root = insertSeq (Seq.toList seq) set.root }
+            let newChild = insertSeq tail child
+
+            { node with
+                children = Map.add head newChild node.children }
+
+    { set with
+        root = insertSeq (Seq.toList seq) set.root }
 
 let contains (seq: seq<'T>) (set: PrefixTreeSet<'T>) : bool =
     let rec findNode seqList node =
@@ -70,10 +74,13 @@ let remove (seq: seq<'T>) (set: PrefixTreeSet<'T>) : PrefixTreeSet<'T> =
                     Some { node with children = newChildren }
                 | None ->
                     let remainingChildren = Map.remove head node.children
+
                     if remainingChildren.IsEmpty && not node.isEndOfSequence then
                         None
                     else
-                        Some { node with children = remainingChildren }
+                        Some
+                            { node with
+                                children = remainingChildren }
             | None -> Some node
 
     match removeSeq (Seq.toList seq) set.root with
@@ -89,34 +96,40 @@ let size (set: PrefixTreeSet<'T>) : int =
 
 let toList (set: PrefixTreeSet<'T>) : 'T list list =
     let rec collect acc currentPath node =
-        let newPath = if node.isEndOfSequence then List.rev currentPath :: acc else acc
-        node.children |> Map.fold (fun acc' key child ->
-            collect acc' (key :: currentPath) child) newPath
+        let newPath =
+            if node.isEndOfSequence then
+                List.rev currentPath :: acc
+            else
+                acc
+
+        node.children
+        |> Map.fold (fun acc' key child -> collect acc' (key :: currentPath) child) newPath
 
     collect [] [] set.root |> List.filter (fun x -> x <> [])
 
 let fold (folder: 'State -> 'T list -> 'State) (state: 'State) (set: PrefixTreeSet<'T>) : 'State =
     let rec collect acc currentPath node =
-        let newAcc = if node.isEndOfSequence && currentPath <> [] then folder acc (List.rev currentPath) else acc
-        node.children |> Map.fold (fun acc' key child ->
-            collect acc' (key :: currentPath) child) newAcc
+        let newAcc =
+            if node.isEndOfSequence && currentPath <> [] then
+                folder acc (List.rev currentPath)
+            else
+                acc
+
+        node.children
+        |> Map.fold (fun acc' key child -> collect acc' (key :: currentPath) child) newAcc
 
     collect state [] set.root
 
 let filter (predicate: 'T list -> bool) (set: PrefixTreeSet<'T>) : PrefixTreeSet<'T> =
-    set |> toList |> List.filter predicate |> List.fold (fun s seq -> add seq s) empty
+    set
+    |> toList
+    |> List.filter predicate
+    |> List.fold (fun s seq -> add seq s) empty
 
 let map (mapping: 'T list -> 'U list) (set: PrefixTreeSet<'T>) : PrefixTreeSet<'U> =
     set |> toList |> List.map mapping |> List.fold (fun s seq -> add seq s) empty
 
 let exists (predicate: 'T list -> bool) (set: PrefixTreeSet<'T>) : bool =
-    let rec check node currentPath =
-        if node.isEndOfSequence && currentPath <> [] && predicate (List.rev currentPath) then
-            true
-        else
-            node.children |> Map.exists (fun _ child -> check child (_ :: currentPath))  // Fixed: pass the key
-
-    // Corrected version:
     let rec check node currentPath =
         if node.isEndOfSequence && currentPath <> [] && predicate (List.rev currentPath) then
             true
@@ -133,6 +146,7 @@ let iter (action: 'T list -> unit) (set: PrefixTreeSet<'T>) : unit =
     let rec traverse currentPath node =
         if node.isEndOfSequence && currentPath <> [] then
             action (List.rev currentPath)
+
         node.children |> Map.iter (fun key child -> traverse (key :: currentPath) child)
 
     traverse [] set.root
@@ -141,3 +155,46 @@ let iter (action: 'T list -> unit) (set: PrefixTreeSet<'T>) : unit =
 let addString (str: string) (set: PrefixTreeSet<char>) = add str set
 let containsString (str: string) (set: PrefixTreeSet<char>) = contains str set
 let hasPrefixString (prefix: string) (set: PrefixTreeSet<char>) = hasPrefix prefix set
+
+
+// Monoid operation: Union of two prefix tree sets
+let union (set1: PrefixTreeSet<'T>) (set2: PrefixTreeSet<'T>) : PrefixTreeSet<'T> =
+    let rec mergeNodes (node1: PrefixTreeSetNode<'T>) (node2: PrefixTreeSetNode<'T>) =
+        // Optimization: Skip empty nodes
+        let isEmptyNode (n: PrefixTreeSetNode<'T>) =
+            n.children.IsEmpty && not n.isEndOfSequence
+
+        if isEmptyNode node1 then
+            node2
+        elif isEmptyNode node2 then
+            node1
+        else
+            let combinedEnd = node1.isEndOfSequence || node2.isEndOfSequence
+            let keys1 = node1.children |> Map.keys |> Set.ofSeq
+            let keys2 = node2.children |> Map.keys |> Set.ofSeq
+            let allKeys = Set.union keys1 keys2
+
+            let mergedChildren =
+                Set.fold
+                    (fun acc key ->
+                        let child1 =
+                            Map.tryFind key node1.children
+                            |> Option.defaultValue
+                                { children = Map.empty
+                                  isEndOfSequence = false }
+
+                        let child2 =
+                            Map.tryFind key node2.children
+                            |> Option.defaultValue
+                                { children = Map.empty
+                                  isEndOfSequence = false }
+
+                        let mergedChild = mergeNodes child1 child2
+                        Map.add key mergedChild acc)
+                    Map.empty
+                    allKeys
+
+            { children = mergedChildren
+              isEndOfSequence = combinedEnd }
+
+    { root = mergeNodes set1.root set2.root }
